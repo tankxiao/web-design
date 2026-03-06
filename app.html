@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>我的待办事项</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: #f0f2f5;
+    color: #2d3748;
+    min-height: 100vh;
+  }
+
+  /* ───────── 通用 ───────── */
+  .hidden { display: none !important; }
+
+  .btn {
+    padding: 9px 18px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity .2s, transform .1s;
+  }
+  .btn:hover { opacity: .88; }
+  .btn:active { transform: scale(.97); }
+  .btn-primary { background: linear-gradient(135deg,#667eea,#764ba2); color:#fff; }
+  .btn-danger  { background: #fc8181; color:#fff; }
+  .btn-ghost   { background: transparent; color:#667eea; border:2px solid #667eea; }
+  .btn-sm { padding: 5px 12px; font-size: 13px; }
+
+  input, textarea {
+    width: 100%;
+    padding: 10px 14px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color .2s;
+    background: #f7fafc;
+    font-family: inherit;
+  }
+  input:focus, textarea:focus { border-color: #667eea; background: #fff; }
+  textarea { resize: vertical; min-height: 80px; }
+
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 13px; font-weight: 600; color:#4a5568; margin-bottom:6px; }
+
+  /* ───────── 模态框 ───────── */
+  .modal-mask {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.45);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+  }
+  .modal {
+    background: #fff;
+    border-radius: 14px;
+    padding: 32px 28px;
+    width: 420px;
+    max-width: 95vw;
+    box-shadow: 0 20px 60px rgba(0,0,0,.2);
+  }
+  .modal h2 { font-size: 20px; margin-bottom: 22px; color:#2d3748; }
+  .modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:20px; }
+
+  /* ───────── AUTH ───────── */
+  #auth-page {
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+  }
+  .auth-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 44px 38px;
+    width: 380px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.2);
+  }
+  .auth-card .logo {
+    width: 60px; height: 60px;
+    background: linear-gradient(135deg,#667eea,#764ba2);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 16px;
+    font-size: 26px;
+  }
+  .auth-card h1 { text-align:center; font-size:22px; margin-bottom:6px; }
+  .auth-card .subtitle { text-align:center; color:#718096; font-size:13px; margin-bottom:28px; }
+  .auth-tabs { display:flex; gap:0; margin-bottom:26px; border-radius:8px; overflow:hidden; border:2px solid #e2e8f0; }
+  .auth-tab {
+    flex:1; padding:9px; text-align:center; cursor:pointer;
+    font-size:14px; font-weight:600; color:#718096;
+    transition: background .2s, color .2s;
+  }
+  .auth-tab.active { background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; }
+  .auth-error { color:#e53e3e; font-size:13px; margin-top:-8px; margin-bottom:10px; min-height:18px; }
+  .auth-card .btn-primary { width:100%; padding:13px; font-size:15px; margin-top:4px; }
+
+  /* ───────── MAIN APP ───────── */
+  #app-page { display: flex; flex-direction: column; min-height: 100vh; }
+
+  /* Navbar */
+  .navbar {
+    background: linear-gradient(135deg,#667eea,#764ba2);
+    color: #fff;
+    padding: 0 24px;
+    height: 58px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 2px 12px rgba(102,126,234,.4);
+    position: sticky; top:0; z-index:50;
+  }
+  .navbar .brand { font-size:18px; font-weight:700; letter-spacing:.5px; }
+  .navbar .brand span { font-size:22px; margin-right:8px; }
+  .navbar .user-info { display:flex; align-items:center; gap:14px; font-size:14px; }
+  .navbar .avatar {
+    width:34px; height:34px; border-radius:50%;
+    background:rgba(255,255,255,.3);
+    display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:15px;
+  }
+  .btn-logout {
+    background:rgba(255,255,255,.2); color:#fff;
+    border:1px solid rgba(255,255,255,.4);
+    padding:6px 14px; border-radius:6px; font-size:13px; cursor:pointer;
+    transition:background .2s;
+  }
+  .btn-logout:hover { background:rgba(255,255,255,.3); }
+
+  /* Layout */
+  .app-body { display:flex; flex:1; overflow:hidden; }
+
+  /* Sidebar */
+  .sidebar {
+    width: 250px;
+    background: #fff;
+    border-right: 1px solid #e2e8f0;
+    display: flex; flex-direction:column;
+    height: calc(100vh - 58px);
+    position: sticky; top:58px;
+    overflow-y: auto;
+  }
+  .sidebar-header {
+    padding: 20px 18px 12px;
+    display: flex; align-items:center; justify-content:space-between;
+  }
+  .sidebar-header h3 { font-size:13px; font-weight:700; color:#718096; text-transform:uppercase; letter-spacing:.8px; }
+  .btn-add-cat {
+    width:28px; height:28px; border-radius:6px;
+    background:linear-gradient(135deg,#667eea,#764ba2);
+    color:#fff; border:none; font-size:18px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition: opacity .2s;
+  }
+  .btn-add-cat:hover { opacity:.85; }
+
+  .cat-list { flex:1; padding: 4px 10px 16px; }
+  .cat-item {
+    display:flex; align-items:center; gap:10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background .15s;
+    margin-bottom: 3px;
+    user-select: none;
+  }
+  .cat-item:hover { background:#f0f2f5; }
+  .cat-item.active { background:linear-gradient(135deg,#667eea15,#764ba215); }
+  .cat-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+  .cat-name { flex:1; font-size:14px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cat-count { font-size:12px; color:#a0aec0; background:#f0f2f5; padding:2px 7px; border-radius:10px; }
+  .cat-actions { display:none; gap:4px; }
+  .cat-item:hover .cat-actions { display:flex; }
+  .cat-action-btn {
+    width:24px; height:24px; border:none; border-radius:5px;
+    cursor:pointer; font-size:13px;
+    display:flex; align-items:center; justify-content:center;
+    transition:background .15s;
+  }
+  .cat-action-btn.edit { background:#ebf4ff; color:#3182ce; }
+  .cat-action-btn.del  { background:#fff5f5; color:#e53e3e; }
+
+  /* Main content */
+  .main-content { flex:1; padding:28px 32px; overflow-y:auto; height:calc(100vh - 58px); }
+
+  .content-header {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:24px;
+  }
+  .content-header h2 { font-size:22px; font-weight:700; }
+  .content-header .meta { font-size:13px; color:#a0aec0; margin-top:4px; }
+
+  .filter-tabs { display:flex; gap:8px; margin-bottom:22px; }
+  .filter-tab {
+    padding:7px 16px; border-radius:20px; font-size:13px; font-weight:600;
+    cursor:pointer; border:2px solid #e2e8f0; background:#fff; color:#718096;
+    transition: all .2s;
+  }
+  .filter-tab.active { border-color:#667eea; background:#667eea; color:#fff; }
+
+  /* Todo cards */
+  .todo-grid { display:flex; flex-direction:column; gap:12px; }
+
+  .todo-card {
+    background:#fff; border-radius:12px;
+    padding:18px 20px;
+    box-shadow:0 2px 8px rgba(0,0,0,.06);
+    border-left:4px solid #667eea;
+    display:flex; align-items:flex-start; gap:14px;
+    transition: box-shadow .2s, transform .15s;
+  }
+  .todo-card:hover { box-shadow:0 4px 16px rgba(0,0,0,.1); transform:translateY(-1px); }
+  .todo-card.done { border-left-color:#68d391; opacity:.75; }
+
+  .todo-checkbox {
+    width:22px; height:22px; border-radius:6px;
+    border:2px solid #cbd5e0;
+    flex-shrink:0; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:all .2s; margin-top:2px;
+  }
+  .todo-checkbox.checked { background:#68d391; border-color:#68d391; color:#fff; font-size:13px; }
+
+  .todo-body { flex:1; min-width:0; }
+  .todo-title { font-size:15px; font-weight:600; margin-bottom:5px; }
+  .todo-card.done .todo-title { text-decoration:line-through; color:#a0aec0; }
+  .todo-desc { font-size:13px; color:#718096; line-height:1.6; }
+  .todo-footer { display:flex; align-items:center; gap:8px; margin-top:10px; }
+  .todo-status {
+    font-size:11px; font-weight:700; padding:3px 10px; border-radius:10px;
+  }
+  .todo-status.done  { background:#f0fff4; color:#276749; }
+  .todo-status.todo  { background:#ebf8ff; color:#2b6cb0; }
+
+  .todo-card-actions { display:flex; gap:6px; flex-shrink:0; opacity:0; transition:opacity .2s; }
+  .todo-card:hover .todo-card-actions { opacity:1; }
+
+  .empty-state {
+    text-align:center; padding:60px 20px; color:#a0aec0;
+  }
+  .empty-state .icon { font-size:56px; margin-bottom:14px; }
+  .empty-state p { font-size:15px; }
+
+  .no-cat-tip {
+    display:flex; align-items:center; justify-content:center;
+    height:60vh; flex-direction:column; gap:16px; color:#a0aec0;
+  }
+  .no-cat-tip .icon { font-size:64px; }
+  .no-cat-tip p { font-size:16px; }
+</style>
+</head>
+<body>
+
+<!-- ══════════ AUTH PAGE ══════════ -->
+<div id="auth-page">
+  <div class="auth-card">
+    <div class="logo">✅</div>
+    <h1>我的待办</h1>
+    <p class="subtitle">管理你的每一件事</p>
+
+    <div class="auth-tabs">
+      <div class="auth-tab active" onclick="switchTab('login')">登录</div>
+      <div class="auth-tab" onclick="switchTab('register')">注册</div>
+    </div>
+
+    <!-- 登录 -->
+    <div id="login-form">
+      <div class="form-group">
+        <label>用户名</label>
+        <input id="login-username" type="text" placeholder="请输入用户名" />
+      </div>
+      <div class="form-group">
+        <label>密码</label>
+        <input id="login-password" type="password" placeholder="请输入密码" onkeydown="if(event.key==='Enter')doLogin()" />
+      </div>
+      <div class="auth-error" id="login-error"></div>
+      <button class="btn btn-primary" onclick="doLogin()">登 录</button>
+    </div>
+
+    <!-- 注册 -->
+    <div id="register-form" class="hidden">
+      <div class="form-group">
+        <label>用户名</label>
+        <input id="reg-username" type="text" placeholder="请输入用户名（3-16位）" />
+      </div>
+      <div class="form-group">
+        <label>密码</label>
+        <input id="reg-password" type="password" placeholder="请输入密码（至少6位）" />
+      </div>
+      <div class="form-group">
+        <label>确认密码</label>
+        <input id="reg-password2" type="password" placeholder="再次输入密码" onkeydown="if(event.key==='Enter')doRegister()" />
+      </div>
+      <div class="auth-error" id="register-error"></div>
+      <button class="btn btn-primary" onclick="doRegister()">注 册</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ APP PAGE ══════════ -->
+<div id="app-page" class="hidden">
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="brand"><span>✅</span>我的待办</div>
+    <div class="user-info">
+      <div class="avatar" id="nav-avatar"></div>
+      <span id="nav-username"></span>
+      <button class="btn-logout" onclick="doLogout()">退出</button>
+    </div>
+  </nav>
+
+  <div class="app-body">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h3>分类</h3>
+        <button class="btn-add-cat" onclick="openCatModal()" title="新建分类">+</button>
+      </div>
+      <div class="cat-list" id="cat-list"></div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main-content">
+      <div id="no-cat-tip" class="no-cat-tip">
+        <div class="icon">📂</div>
+        <p>请先在左侧创建一个分类</p>
+        <button class="btn btn-primary" onclick="openCatModal()">+ 新建分类</button>
+      </div>
+
+      <div id="todo-area" class="hidden">
+        <div class="content-header">
+          <div>
+            <h2 id="cat-title">分类名称</h2>
+            <div class="meta" id="cat-meta"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openTodoModal()">+ 新建待办</button>
+        </div>
+
+        <div class="filter-tabs">
+          <div class="filter-tab active" onclick="setFilter('all',this)">全部</div>
+          <div class="filter-tab" onclick="setFilter('todo',this)">未完成</div>
+          <div class="filter-tab" onclick="setFilter('done',this)">已完成</div>
+        </div>
+
+        <div class="todo-grid" id="todo-list"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ══════════ 分类 Modal ══════════ -->
+<div class="modal-mask hidden" id="cat-modal">
+  <div class="modal">
+    <h2 id="cat-modal-title">新建分类</h2>
+    <div class="form-group">
+      <label>分类名称</label>
+      <input id="cat-name-input" type="text" placeholder="请输入分类名称" maxlength="20" />
+    </div>
+    <div class="form-group">
+      <label>颜色标签</label>
+      <div id="color-picker" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeCatModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveCat()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ 待办 Modal ══════════ -->
+<div class="modal-mask hidden" id="todo-modal">
+  <div class="modal">
+    <h2 id="todo-modal-title">新建待办</h2>
+    <div class="form-group">
+      <label>标题</label>
+      <input id="todo-title-input" type="text" placeholder="请输入待办标题" maxlength="50" />
+    </div>
+    <div class="form-group">
+      <label>描述（可选）</label>
+      <textarea id="todo-desc-input" placeholder="请输入详细描述..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeTodoModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveTodo()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════ 数据层 ══════════
+const DB = {
+  get(key) { try { return JSON.parse(localStorage.getItem(key)) || []; } catch { return []; } },
+  set(key, val) { localStorage.setItem(key, JSON.stringify(val)); },
+  users()      { return DB.get('todo_users'); },
+  categories() { return DB.get('todo_cats'); },
+  todos()      { return DB.get('todo_items'); },
+  saveUsers(d)      { DB.set('todo_users', d); },
+  saveCats(d)       { DB.set('todo_cats', d); },
+  saveTodos(d)      { DB.set('todo_items', d); },
+  currentUser()     { try { return JSON.parse(sessionStorage.getItem('todo_user')); } catch { return null; } },
+  setUser(u)        { sessionStorage.setItem('todo_user', JSON.stringify(u)); },
+  clearUser()       { sessionStorage.removeItem('todo_user'); }
+};
+
+const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+const COLORS = ['#667eea','#f6ad55','#68d391','#fc8181','#76e4f7','#b794f4','#f687b3','#4fd1c5'];
+
+// ══════════ 状态 ══════════
+let currentCatId = null;
+let selectedColor = COLORS[0];
+let editCatId = null;
+let editTodoId = null;
+let currentFilter = 'all';
+
+// ══════════ AUTH ══════════
+function switchTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach((el,i) => el.classList.toggle('active', (tab==='login') ? i===0 : i===1));
+  document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
+  document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
+}
+
+function doLogin() {
+  const u = document.getElementById('login-username').value.trim();
+  const p = document.getElementById('login-password').value;
+  const err = document.getElementById('login-error');
+  if (!u || !p) { err.textContent = '请填写用户名和密码'; return; }
+  const users = DB.users();
+  const user = users.find(x => x.username === u && x.password === p);
+  if (!user) { err.textContent = '用户名或密码错误'; return; }
+  err.textContent = '';
+  DB.setUser(user);
+  enterApp(user);
+}
+
+function doRegister() {
+  const u = document.getElementById('reg-username').value.trim();
+  const p = document.getElementById('reg-password').value;
+  const p2 = document.getElementById('reg-password2').value;
+  const err = document.getElementById('register-error');
+  if (u.length < 3) { err.textContent = '用户名至少3位'; return; }
+  if (p.length < 6) { err.textContent = '密码至少6位'; return; }
+  if (p !== p2)     { err.textContent = '两次密码不一致'; return; }
+  const users = DB.users();
+  if (users.find(x => x.username === u)) { err.textContent = '用户名已存在'; return; }
+  const user = { id: uid(), username: u, password: p };
+  users.push(user);
+  DB.saveUsers(users);
+  err.style.color = '#38a169';
+  err.textContent = '注册成功，请登录';
+  setTimeout(() => { err.textContent=''; err.style.color='#e53e3e'; switchTab('login'); document.getElementById('login-username').value=u; }, 1000);
+}
+
+function doLogout() {
+  DB.clearUser();
+  currentCatId = null;
+  document.getElementById('auth-page').classList.remove('hidden');
+  document.getElementById('app-page').classList.add('hidden');
+  document.getElementById('login-username').value='';
+  document.getElementById('login-password').value='';
+}
+
+// ══════════ APP ══════════
+function enterApp(user) {
+  document.getElementById('auth-page').classList.add('hidden');
+  document.getElementById('app-page').classList.remove('hidden');
+  document.getElementById('nav-username').textContent = user.username;
+  document.getElementById('nav-avatar').textContent = user.username[0].toUpperCase();
+  renderCats();
+}
+
+// ── 分类 ──
+function renderCats() {
+  const user = DB.currentUser();
+  const cats = DB.categories().filter(c => c.userId === user.id);
+  const todos = DB.todos().filter(t => t.userId === user.id);
+  const list = document.getElementById('cat-list');
+  list.innerHTML = '';
+
+  if (cats.length === 0) {
+    document.getElementById('no-cat-tip').classList.remove('hidden');
+    document.getElementById('todo-area').classList.add('hidden');
+    currentCatId = null;
+    return;
+  }
+
+  cats.forEach(cat => {
+    const count = todos.filter(t => t.categoryId === cat.id).length;
+    const div = document.createElement('div');
+    div.className = 'cat-item' + (cat.id === currentCatId ? ' active' : '');
+    div.innerHTML = `
+      <div class="cat-dot" style="background:${cat.color}"></div>
+      <div class="cat-name">${esc(cat.name)}</div>
+      <div class="cat-count">${count}</div>
+      <div class="cat-actions">
+        <button class="cat-action-btn edit" onclick="openCatModal('${cat.id}');event.stopPropagation()">✏️</button>
+        <button class="cat-action-btn del"  onclick="deleteCat('${cat.id}');event.stopPropagation()">🗑</button>
+      </div>`;
+    div.onclick = () => selectCat(cat.id);
+    list.appendChild(div);
+  });
+
+  if (currentCatId && cats.find(c => c.id === currentCatId)) {
+    renderTodos();
+  } else if (cats.length > 0) {
+    selectCat(cats[0].id);
+  }
+}
+
+function selectCat(id) {
+  currentCatId = id;
+  currentFilter = 'all';
+  document.querySelectorAll('.filter-tab').forEach((el,i) => el.classList.toggle('active', i===0));
+  document.getElementById('no-cat-tip').classList.add('hidden');
+  document.getElementById('todo-area').classList.remove('hidden');
+  document.querySelectorAll('.cat-item').forEach(el => el.classList.remove('active'));
+  event && event.currentTarget && event.currentTarget.classList.add('active');
+  renderTodos();
+  // 重新渲染侧边栏高亮
+  renderCats();
+}
+
+function openCatModal(id) {
+  editCatId = id || null;
+  buildColorPicker();
+  if (id) {
+    const cat = DB.categories().find(c => c.id === id);
+    document.getElementById('cat-modal-title').textContent = '编辑分类';
+    document.getElementById('cat-name-input').value = cat.name;
+    selectedColor = cat.color;
+  } else {
+    document.getElementById('cat-modal-title').textContent = '新建分类';
+    document.getElementById('cat-name-input').value = '';
+    selectedColor = COLORS[0];
+  }
+  buildColorPicker();
+  document.getElementById('cat-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('cat-name-input').focus(), 50);
+}
+
+function closeCatModal() {
+  document.getElementById('cat-modal').classList.add('hidden');
+  editCatId = null;
+}
+
+function buildColorPicker() {
+  const el = document.getElementById('color-picker');
+  el.innerHTML = '';
+  COLORS.forEach(c => {
+    const d = document.createElement('div');
+    d.style.cssText = `width:28px;height:28px;border-radius:50%;background:${c};cursor:pointer;border:3px solid ${c===selectedColor?'#2d3748':'transparent'};transition:border .15s;`;
+    d.onclick = () => { selectedColor = c; buildColorPicker(); };
+    el.appendChild(d);
+  });
+}
+
+function saveCat() {
+  const name = document.getElementById('cat-name-input').value.trim();
+  if (!name) { alert('请输入分类名称'); return; }
+  const user = DB.currentUser();
+  const cats = DB.categories();
+  if (editCatId) {
+    const i = cats.findIndex(c => c.id === editCatId);
+    cats[i].name = name; cats[i].color = selectedColor;
+  } else {
+    cats.push({ id: uid(), userId: user.id, name, color: selectedColor });
+  }
+  DB.saveCats(cats);
+  closeCatModal();
+  renderCats();
+}
+
+function deleteCat(id) {
+  if (!confirm('删除分类将同时删除其中所有待办，确定吗？')) return;
+  DB.saveCats(DB.categories().filter(c => c.id !== id));
+  DB.saveTodos(DB.todos().filter(t => t.categoryId !== id));
+  if (currentCatId === id) currentCatId = null;
+  renderCats();
+}
+
+// ── 待办 ──
+function renderTodos() {
+  const user = DB.currentUser();
+  const cat = DB.categories().find(c => c.id === currentCatId);
+  if (!cat) return;
+
+  document.getElementById('cat-title').textContent = cat.name;
+
+  let todos = DB.todos().filter(t => t.userId === user.id && t.categoryId === currentCatId);
+  const total = todos.length;
+  const doneCount = todos.filter(t => t.completed).length;
+  document.getElementById('cat-meta').textContent = `共 ${total} 项 · 已完成 ${doneCount} 项`;
+
+  if (currentFilter === 'done') todos = todos.filter(t => t.completed);
+  if (currentFilter === 'todo') todos = todos.filter(t => !t.completed);
+
+  const list = document.getElementById('todo-list');
+  list.innerHTML = '';
+
+  if (todos.length === 0) {
+    list.innerHTML = `<div class="empty-state"><div class="icon">🎉</div><p>${currentFilter==='done'?'暂无已完成的待办':currentFilter==='todo'?'暂无未完成的待办':'还没有待办，点击右上角新建吧'}</p></div>`;
+    return;
+  }
+
+  todos.sort((a,b) => a.completed - b.completed || b.createdAt - a.createdAt);
+
+  todos.forEach(todo => {
+    const card = document.createElement('div');
+    card.className = 'todo-card' + (todo.completed ? ' done' : '');
+    card.innerHTML = `
+      <div class="todo-checkbox ${todo.completed?'checked':''}" onclick="toggleTodo('${todo.id}')">${todo.completed?'✓':''}</div>
+      <div class="todo-body">
+        <div class="todo-title">${esc(todo.title)}</div>
+        ${todo.description ? `<div class="todo-desc">${esc(todo.description)}</div>` : ''}
+        <div class="todo-footer">
+          <span class="todo-status ${todo.completed?'done':'todo'}">${todo.completed?'✅ 已完成':'🔵 未完成'}</span>
+        </div>
+      </div>
+      <div class="todo-card-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openTodoModal('${todo.id}')">编辑</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteTodo('${todo.id}')">删除</button>
+      </div>`;
+    list.appendChild(card);
+  });
+}
+
+function setFilter(f, el) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderTodos();
+}
+
+function openTodoModal(id) {
+  editTodoId = id || null;
+  if (id) {
+    const todo = DB.todos().find(t => t.id === id);
+    document.getElementById('todo-modal-title').textContent = '编辑待办';
+    document.getElementById('todo-title-input').value = todo.title;
+    document.getElementById('todo-desc-input').value = todo.description || '';
+  } else {
+    document.getElementById('todo-modal-title').textContent = '新建待办';
+    document.getElementById('todo-title-input').value = '';
+    document.getElementById('todo-desc-input').value = '';
+  }
+  document.getElementById('todo-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('todo-title-input').focus(), 50);
+}
+
+function closeTodoModal() {
+  document.getElementById('todo-modal').classList.add('hidden');
+  editTodoId = null;
+}
+
+function saveTodo() {
+  const title = document.getElementById('todo-title-input').value.trim();
+  const desc  = document.getElementById('todo-desc-input').value.trim();
+  if (!title) { alert('请输入待办标题'); return; }
+  const user = DB.currentUser();
+  const todos = DB.todos();
+  if (editTodoId) {
+    const i = todos.findIndex(t => t.id === editTodoId);
+    todos[i].title = title; todos[i].description = desc;
+  } else {
+    todos.push({ id:uid(), userId:user.id, categoryId:currentCatId, title, description:desc, completed:false, createdAt:Date.now() });
+  }
+  DB.saveTodos(todos);
+  closeTodoModal();
+  renderTodos();
+  renderCats();
+}
+
+function toggleTodo(id) {
+  const todos = DB.todos();
+  const i = todos.findIndex(t => t.id === id);
+  todos[i].completed = !todos[i].completed;
+  DB.saveTodos(todos);
+  renderTodos();
+  renderCats();
+}
+
+function deleteTodo(id) {
+  if (!confirm('确定删除这条待办？')) return;
+  DB.saveTodos(DB.todos().filter(t => t.id !== id));
+  renderTodos();
+  renderCats();
+}
+
+// XSS 防护
+function esc(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// 点击遮罩关闭
+document.getElementById('cat-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeCatModal(); });
+document.getElementById('todo-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeTodoModal(); });
+
+// ══════════ 初始化 ══════════
+(function init() {
+  const user = DB.currentUser();
+  if (user) enterApp(user);
+})();
+</script>
+</body>
+</html>
